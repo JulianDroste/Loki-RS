@@ -94,7 +94,6 @@ The easiest way to set up signatures is using the included `loki-util` tool:
 
 This downloads:
 - **YARA rules** from [YARA Forge](https://yaraforge.com/) (Core rule set)
-- **IOCs** from [signature-base](https://github.com/Neo23x0/signature-base)
 
 Alternatively, you can manually download:
 
@@ -104,12 +103,10 @@ Alternatively, you can manually download:
    unzip yara-forge-rules-core.zip -d ./signatures/yara/
    ```
 
-2. **IOCs** - Download from signature-base:
-   ```bash
-   wget https://github.com/Neo23x0/signature-base/archive/master.tar.gz
-   tar -xzf master.tar.gz
-   cp -r signature-base-master/iocs ./signatures/
-   ```
+2. **Optional custom IOCs** - Add your own IOC files to `./signatures/iocs/`:
+   - `hash-*.txt` for hash indicators
+   - `filename-*.txt` for filename pattern indicators
+   - `c2-*.txt` for C2 indicators
 
 ## Configuration
 
@@ -227,5 +224,4 @@ See `README.md` for detailed build instructions and requirements.
 ## License
 
 See `LICENSE` file for license information.
-
 

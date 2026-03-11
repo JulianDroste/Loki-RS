@@ -10,7 +10,6 @@ use dialoguer::{Select, theme::ColorfulTheme};
 use glob::glob;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const SIGNATURE_BASE_URL: &str = "https://github.com/Neo23x0/signature-base/archive/master.tar.gz";
 const YARA_FORGE_URL: &str = "https://github.com/YARAHQ/yara-forge/releases/latest/download/yara-forge-rules-core.zip";
 const LOKI_RELEASES_URL: &str = "https://api.github.com/repos/Neo23x0/Loki-RS/releases";
 const SIGNATURES_DIR: &str = "./signatures";
@@ -127,7 +126,7 @@ fn print_usage() {
     println!("Usage: loki-util <command>");
     println!();
     println!("Commands:");
-    println!("  {}   - Update signatures (IOCs and YARA rules)", "update".green());
+    println!("  {}   - Update YARA rules (YARA-Forge Core)", "update".green());
     println!("  {}  - Update Loki-RS program and signatures", "upgrade".green());
     println!("  {}    - Generate HTML report from JSONL file(s)", "html".green());
     println!();
@@ -198,19 +197,23 @@ fn interactive_mode() -> Result<(), Box<dyn std::error::Error>> {
 
 fn update_signatures() -> Result<(), Box<dyn std::error::Error>> {
     // Create signatures directory if it doesn't exist
-    fs::create_dir_all(format!("{}/iocs", SIGNATURES_DIR))?;
     fs::create_dir_all(format!("{}/yara", SIGNATURES_DIR))?;
+    fs::create_dir_all(format!("{}/iocs", SIGNATURES_DIR))?;
     
     // Create temp directory
     fs::create_dir_all(TEMP_DIR)?;
     
-    // Download and extract IOCs from signature-base
-    log_info("Downloading IOCs from signature-base...");
-    download_and_extract_iocs()?;
-    
+    // Remove existing YARA rules before installing the current Core bundle.
+    // This prevents legacy packaged rules from accumulating across updates.
+    clear_existing_yara_rules()?;
+
     // Download and extract YARA rules from yara-forge
     log_info("Downloading YARA rules from yara-forge...");
     download_and_extract_yara_rules()?;
+
+    // Keep IOC files optional, but ensure default placeholder files exist to
+    // maintain compatibility with IOC loading paths.
+    ensure_default_ioc_files()?;
     
     // Clean up temp directory
     fs::remove_dir_all(TEMP_DIR)?;
@@ -236,38 +239,6 @@ fn fetch_url_content(url: &str) -> Result<String, Box<dyn std::error::Error>> {
         .call()?;
     let body = resp.body_mut().read_to_string()?;
     Ok(body)
-}
-
-fn download_and_extract_iocs() -> Result<(), Box<dyn std::error::Error>> {
-    let tar_path = Path::new(TEMP_DIR).join("signature-base.tar.gz");
-    download_file(SIGNATURE_BASE_URL, &tar_path)?;
-    
-    // Extract tar.gz
-    let extract_dir = Path::new(TEMP_DIR).join("signature-base");
-    fs::create_dir_all(&extract_dir)?;
-    
-    let status = Command::new("tar")
-        .arg("-xzf")
-        .arg(tar_path)
-        .arg("-C")
-        .arg(&extract_dir)
-        .arg("--strip-components=1")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()?;
-    
-    if !status.success() {
-        return Err("Failed to extract signature-base archive".into());
-    }
-    
-    // Copy IOCs
-    let iocs_source = extract_dir.join("iocs");
-    if iocs_source.exists() {
-        copy_directory(&iocs_source, Path::new(SIGNATURES_DIR).join("iocs").as_path())?;
-        log_success("IOCs updated from signature-base");
-    }
-    
-    Ok(())
 }
 
 fn download_and_extract_yara_rules() -> Result<(), Box<dyn std::error::Error>> {
@@ -313,22 +284,46 @@ fn download_and_extract_yara_rules() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn copy_directory(src: &Path, dst: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    fs::create_dir_all(dst)?;
-    
-    for entry in fs::read_dir(src)? {
+fn clear_existing_yara_rules() -> Result<(), Box<dyn std::error::Error>> {
+    let yara_dir = Path::new(SIGNATURES_DIR).join("yara");
+    if !yara_dir.exists() {
+        return Ok(());
+    }
+
+    for entry in fs::read_dir(&yara_dir)? {
         let entry = entry?;
         let path = entry.path();
-        let file_name = path.file_name().unwrap();
-        let dest_path = dst.join(file_name);
-        
-        if path.is_dir() {
-            copy_directory(&path, &dest_path)?;
-        } else {
-            fs::copy(&path, &dest_path)?;
+        if !path.is_file() {
+            continue;
+        }
+
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext.eq_ignore_ascii_case("yar") || ext.eq_ignore_ascii_case("yara") {
+            fs::remove_file(path)?;
         }
     }
-    
+
+    Ok(())
+}
+
+fn ensure_default_ioc_files() -> Result<(), Box<dyn std::error::Error>> {
+    let iocs_dir = Path::new(SIGNATURES_DIR).join("iocs");
+    fs::create_dir_all(&iocs_dir)?;
+
+    let defaults = [
+        ("hash-iocs.txt", "# Optional custom hash IOCs\n"),
+        ("filename-iocs.txt", "# Optional custom filename IOCs\n"),
+        ("c2-iocs.txt", "# Optional custom C2 IOCs\n"),
+        ("keywords.txt", "# Optional custom keyword IOCs\n"),
+    ];
+
+    for (name, content) in defaults {
+        let path = iocs_dir.join(name);
+        if !path.exists() {
+            fs::write(path, content)?;
+        }
+    }
+
     Ok(())
 }
 

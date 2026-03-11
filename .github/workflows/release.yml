@@ -198,7 +198,17 @@ jobs:
       - name: Fetch signatures
         shell: bash
         run: |
-          git clone --depth 1 https://github.com/Neo23x0/signature-base.git signatures
+          mkdir -p signatures/yara signatures/iocs tmp
+          curl -sL https://github.com/YARAHQ/yara-forge/releases/latest/download/yara-forge-rules-core.zip -o tmp/yara-forge-rules-core.zip
+          python -c "import zipfile; zipfile.ZipFile('tmp/yara-forge-rules-core.zip').extractall('tmp/yara-forge')"
+          find tmp/yara-forge -name "*.yar" -exec cp {} signatures/yara/ \;
+          rm -rf tmp
+
+          # IOCs are optional and user-supplied; provide placeholder files.
+          echo "# Optional custom hash IOCs" > signatures/iocs/hash-iocs.txt
+          echo "# Optional custom filename IOCs" > signatures/iocs/filename-iocs.txt
+          echo "# Optional custom C2 IOCs" > signatures/iocs/c2-iocs.txt
+          echo "# Optional custom keyword IOCs" > signatures/iocs/keywords.txt
 
       - name: Create release archive (Linux/macOS)
         if: runner.os != 'Windows'
