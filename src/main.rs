@@ -274,8 +274,10 @@ fn initialize_hash_iocs(logger: &UnifiedLogger) -> Vec<HashIOC> {
     let hash_iocs_string = match fs::read_to_string(&hash_ioc_file) {
         Ok(content) => content,
         Err(e) => {
-            logger.error(&format!("Unable to read hash IOC file {}: {:?}", hash_ioc_file, e));
-            logger.error(&format!("Please ensure IOCs are available at {}/iocs/ (run 'loki-util update' to download)", SIGNATURE_SOURCE));
+            logger.info(&format!(
+                "No hash IOC file found at {} ({:?}) - continuing without hash IOCs",
+                hash_ioc_file, e
+            ));
             return Vec::new(); // Return empty vector instead of panicking
         }
     };
@@ -658,8 +660,10 @@ fn initialize_filename_iocs(logger: &UnifiedLogger) -> Vec<FilenameIOC> {
     let filename_iocs_string = match fs::read_to_string(&filename_ioc_file) {
         Ok(content) => content,
         Err(e) => {
-            logger.error(&format!("Unable to read filename IOC file {}: {:?}", filename_ioc_file, e));
-            logger.error(&format!("Please ensure IOCs are available at {}/iocs/ (run 'loki-util update' to download)", SIGNATURE_SOURCE));
+            logger.info(&format!(
+                "No filename IOC file found at {} ({:?}) - continuing without filename IOCs",
+                filename_ioc_file, e
+            ));
             return Vec::new(); // Return empty vector instead of panicking
         }
     };

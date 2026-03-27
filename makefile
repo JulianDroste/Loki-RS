@@ -130,24 +130,12 @@ package: build fetch-signatures install-signatures ## Create a complete build pa
 	@echo "[✓] Config: $(CONFIG_DIR)/"
 	@echo "[✓] Usage guide: $(BUILD_DIR)/USAGE.md"
 
-fetch-signatures: ## Fetch IOCs and YARA signatures from remote repositories
-	@echo "[+] Fetching signatures from remote repositories ..."
-	@mkdir -p ./signatures/iocs
+fetch-signatures: ## Fetch YARA signatures from YARA-Forge (Core)
+	@echo "[+] Fetching YARA signatures from remote repositories ..."
 	@mkdir -p ./signatures/yara
 	@mkdir -p ./tmp
-	@echo "[+] Downloading IOCs from signature-base ..."
-	@if command -v wget >/dev/null 2>&1; then \
-		wget -q https://github.com/Neo23x0/signature-base/archive/master.tar.gz -O ./tmp/signature-base.tar.gz && \
-		tar -xzf ./tmp/signature-base.tar.gz -C ./tmp && \
-		cp -r ./tmp/signature-base-master/iocs/* ./signatures/iocs/ 2>/dev/null || true; \
-	elif command -v curl >/dev/null 2>&1; then \
-		curl -sL https://github.com/Neo23x0/signature-base/archive/master.tar.gz -o ./tmp/signature-base.tar.gz && \
-		tar -xzf ./tmp/signature-base.tar.gz -C ./tmp && \
-		cp -r ./tmp/signature-base-master/iocs/* ./signatures/iocs/ 2>/dev/null || true; \
-	else \
-		echo "[!] Neither wget nor curl found. Skipping IOC download."; \
-	fi
 	@echo "[+] Downloading YARA rules from yara-forge ..."
+	@find ./signatures/yara -type f \( -name "*.yar" -o -name "*.yara" \) -delete 2>/dev/null || true
 	@if command -v wget >/dev/null 2>&1; then \
 		wget -q https://github.com/YARAHQ/yara-forge/releases/latest/download/yara-forge-rules-core.zip -O ./tmp/yara-forge-rules-core.zip && \
 		unzip -q -o ./tmp/yara-forge-rules-core.zip -d ./tmp/yara-forge 2>/dev/null || true && \
@@ -160,9 +148,9 @@ fetch-signatures: ## Fetch IOCs and YARA signatures from remote repositories
 		echo "[!] Neither wget nor curl found. Skipping YARA rules download."; \
 	fi
 	@rm -rf ./tmp
-	@echo "[+] Signatures fetched successfully"
+	@echo "[+] YARA signatures fetched successfully"
 
-install-signatures: ## Install signatures (YARA from YARA Forge, IOCs from signature-base) to build directory
+install-signatures: ## Install signatures (YARA from YARA-Forge, optional local IOCs) to build directory
 	@echo "[+] Setting up signatures ..."
 	@mkdir -p $(SIGNATURES_DIR)
 	@if [ -d "./signatures" ]; then \
@@ -177,8 +165,13 @@ install-signatures: ## Install signatures (YARA from YARA Forge, IOCs from signa
 		mkdir -p $(SIGNATURES_DIR)/yara; \
 		mkdir -p $(SIGNATURES_DIR)/iocs; \
 		echo "# Place YARA rules (.yar files) in this directory" > $(SIGNATURES_DIR)/yara/README.txt; \
-		echo "# Place IOC files in this directory" > $(SIGNATURES_DIR)/iocs/README.txt; \
+		echo "# Place optional custom IOC files in this directory" > $(SIGNATURES_DIR)/iocs/README.txt; \
 	fi
+	@mkdir -p $(SIGNATURES_DIR)/iocs
+	@test -f $(SIGNATURES_DIR)/iocs/hash-iocs.txt || echo "# Optional custom hash IOCs" > $(SIGNATURES_DIR)/iocs/hash-iocs.txt
+	@test -f $(SIGNATURES_DIR)/iocs/filename-iocs.txt || echo "# Optional custom filename IOCs" > $(SIGNATURES_DIR)/iocs/filename-iocs.txt
+	@test -f $(SIGNATURES_DIR)/iocs/c2-iocs.txt || echo "# Optional custom C2 IOCs" > $(SIGNATURES_DIR)/iocs/c2-iocs.txt
+	@test -f $(SIGNATURES_DIR)/iocs/keywords.txt || echo "# Optional custom keyword IOCs" > $(SIGNATURES_DIR)/iocs/keywords.txt
 	@echo "[+] Signatures setup complete"
 
 dist: build fetch-signatures ## Create distribution package (downloads signatures from GitHub)
@@ -202,7 +195,11 @@ dist: build fetch-signatures ## Create distribution package (downloads signature
 	fi
 	@echo "[+] Copying signatures to ./dist/loki/signatures ..."
 	@cp -r ./signatures/yara ./dist/loki/signatures/ 2>/dev/null || true
-	@cp -r ./signatures/iocs ./dist/loki/signatures/ 2>/dev/null || true
+	@mkdir -p ./dist/loki/signatures/iocs
+	@test -f ./dist/loki/signatures/iocs/hash-iocs.txt || echo "# Optional custom hash IOCs" > ./dist/loki/signatures/iocs/hash-iocs.txt
+	@test -f ./dist/loki/signatures/iocs/filename-iocs.txt || echo "# Optional custom filename IOCs" > ./dist/loki/signatures/iocs/filename-iocs.txt
+	@test -f ./dist/loki/signatures/iocs/c2-iocs.txt || echo "# Optional custom C2 IOCs" > ./dist/loki/signatures/iocs/c2-iocs.txt
+	@test -f ./dist/loki/signatures/iocs/keywords.txt || echo "# Optional custom keyword IOCs" > ./dist/loki/signatures/iocs/keywords.txt
 	@echo "[+] Copying documentation ..."
 	@cp LICENSE ./dist/loki/ 2>/dev/null || true
 	@cp README.md ./dist/loki/ 2>/dev/null || true

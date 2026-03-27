@@ -317,7 +317,7 @@ loki-release-v2.0.0/
 ├── LICENSE
 └── signatures/
     ├── yara/     (YARA rules from YARA Forge)
-    └── iocs/     (IOC files from signature-base)
+    └── iocs/     (optional custom IOC files)
 ```
 
 ### Automated Release Builds
@@ -375,7 +375,7 @@ chmod +x target/release/loki
 
 # Or manually create structure and download
 mkdir -p ./signatures/yara ./signatures/iocs
-# Download YARA rules from YARA Forge and IOCs from signature-base
+# Download YARA rules from YARA Forge and optionally add custom IOC files
 ```
 
 #### 5. Build fails with "out of memory"
